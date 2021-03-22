@@ -1635,4 +1635,16 @@ config GPIO_MOCKUP
 
 endmenu
 
+comment "Other GPIO expanders"
+
+config GPIO_MUX_INPUT
+	tristate "General 4-input multiplexer"
+	select MULTIPLEXER
+	select MUX_GPIO
+	depends on OF_GPIO
+	help
+	  Say yes here to enable a generic 4-input gpio multiplexer. This
+	  provides a GPIO interface supporting input mode only allowing input
+	  to be read from several pins one pin at a time.
+
 endif

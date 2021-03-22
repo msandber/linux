@@ -95,7 +95,8 @@ config-openwrt: config-base
 	--enable EPOLL \
 	--enable NET \
 	--enable UNIX \
-	--enable SYSFS
+	--enable SYSFS \
+	--enable CONFIG_GPIO_MUX_INPUT
 
 # do this and bring sources from drivers/mdt/mtdsplit
 #	--enable MTD_ROOTFS_ROOT_DEV \
