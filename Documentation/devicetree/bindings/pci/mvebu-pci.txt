@@ -83,6 +83,7 @@ and the following optional properties:
   specified will default to 100ms, as required by the PCIe specification.
 - interrupt-names: list of interrupt names, supported are:
    - "intx" - interrupt line triggered by one of the legacy interrupt
+   - "error" - interrupt line triggered by any other event (non-intx)
 - interrupts or interrupts-extended: List of the interrupt sources which
   corresponding to the "interrupt-names". If non-empty then also additional
   'interrupt-controller' subnode must be defined.
