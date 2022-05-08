@@ -23,3 +23,15 @@ board. Currently known boards are:
 "marvell,rd-88f5182-nas"
 "maxtor,shared-storage-2"
 "netgear,wnr854t"
+
+The D-Link DNS-323 has three different revisions. Their common parts are
+collected in:
+
+"dlink,dns323"
+
+The three different revision (A1 being 88f5181, the two others being 88f5182)
+are specified with compatibles:
+
+"dlink,dns323a1"
+"dlink,dns323b1"
+"dlink,dns323c1"
