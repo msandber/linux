@@ -1,0 +1,80 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2022 Mauri Sandberg <maukka@ext.kapsi.fi>
+ *
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+#include "orion5x-mv88f5182.dtsi"
+#include "orion5x-dlink-dns323.dtsi"
+
+/ {
+	compatible = "dlink,dns323c1", "dlink,dns323", "marvell,orion5x-88f5182",
+		     "marvell,orion5x";
+
+	fan {
+		compatible = "gpio-fan";
+		pinctrl-0 = <&pmx_gpio_fan>;
+		pinctrl-names = "default";
+
+		gpios = <&gpio0 19 GPIO_ACTIVE_LOW
+			 &gpio0 18 GPIO_ACTIVE_LOW>;
+
+		gpio-fan,speed-map = <0    0
+				      1000 1
+				      2000 2>;
+		alarm-gpios = <&gpio0 10 GPIO_ACTIVE_HIGH>;
+	};
+
+	gpio-keys {
+		/delete-node/ key-1;
+
+		key-0 {
+			gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
+		};
+	};
+
+	gpio-leds {
+		led-0 {
+			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+		};
+
+		led-1 {
+			gpios = <&gpio0 9 GPIO_ACTIVE_LOW>;
+		};
+
+		led-2 {
+			gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+};
+
+&i2c {
+	/delete-node/ fan@3e;
+};
+
+&pinctrl {
+	/delete-node/ pmx-gpio-misc;
+
+	pmx_gpio_fan: pmx-gpio-fan {
+		marvell,pins = "mpp10", "mpp18", "mpp19";
+		marvell,function = "gpio";
+	};
+};
+
+&pmx_gpio_leds {
+	marvell,pins = "mpp8", "mpp9", "mpp17";
+};
+
+&pmx_power_off {
+	marvell,pins = "mpp2";
+};
+
+&pmx_gpio_keys {
+	marvell,pins = "mpp1";
+};
