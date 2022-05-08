@@ -57,6 +57,9 @@ static void __init orion5x_dt_init(void)
 		cpu_idle_poll_ctrl(true);
 	}
 
+	if (of_machine_is_compatible("dlink,dns323"))
+		dns323_init_dt();
+
 	if (of_machine_is_compatible("maxtor,shared-storage-2"))
 		mss2_init();
 
