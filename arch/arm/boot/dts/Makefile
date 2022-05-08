@@ -949,6 +949,9 @@ dtb-$(CONFIG_SOC_DRA7XX) += \
 	dra71-evm.dtb \
 	dra76-evm.dtb
 dtb-$(CONFIG_ARCH_ORION5X) += \
+	orion5x-dlink-dns323a1.dtb \
+	orion5x-dlink-dns323b1.dtb \
+	orion5x-dlink-dns323c1.dtb \
 	orion5x-kuroboxpro.dtb \
 	orion5x-lacie-d2-network.dtb \
 	orion5x-lacie-ethernet-disk-mini-v2.dtb \
