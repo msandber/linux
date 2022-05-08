@@ -1,0 +1,215 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2022 Mauri Sandberg <maukka@ext.kapsi.fi>
+ *
+ */
+
+/ {
+	model = "D-Link DNS-323";
+	compatible = "dlink,dns323", "marvell,orion5x";
+
+	aliases {
+		serial0 = &uart0;
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x00000000 0x4000000>; /* 64 MB */
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+		bootargs = "console=ttyS0,115200n8 earlyprintk";
+	};
+
+	soc {
+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>,  /* on-chip peripheral registers */
+			 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>,     /* SRAM for crypto */
+			 <MBUS_ID(0x01, 0x0f) 0 0xf4000000 0x800000>;  /* device bus mapping (boot) */
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-0 = <&pmx_gpio_keys>;
+		pinctrl-names = "default";
+
+		key-0 {
+			label = "Power button";
+			linux,code = <KEY_POWER>;
+			gpios = <&gpio0 9 GPIO_ACTIVE_LOW>;
+		};
+
+		key-1 {
+			label = "Reset button";
+			linux,code = <KEY_RESTART>;
+			gpios = <&gpio0 10 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+		pinctrl-0 = <&pmx_gpio_leds>;
+		pinctrl-names = "default";
+
+		led-0 {
+			label = "amber:right";
+			gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
+		};
+
+		led-1 {
+			label = "amber:left";
+			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
+		};
+
+		led-2 {
+			label = "blue:power";
+			gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+		};
+	};
+
+	gpio-poweroff {
+		compatible = "gpio-poweroff";
+		pinctrl-0 = <&pmx_power_off>;
+		pinctrl-names = "default";
+
+		gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
+		timeout-ms = <3000>;
+	};
+};
+
+&devbus_bootcs {
+	status = "okay";
+	devbus,keep-config;
+
+	flash@0 {
+		compatible = "cfi-flash";
+		reg = <0 0x800000>;
+		bank-width = <1>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "MTD1";
+				reg = <0x000000 0x010000>;
+				read-only;
+			};
+
+			partition@10000 {
+				label = "MTD2";
+				reg = <0x010000 0x010000>;
+				read-only;
+			};
+
+			partition@20000 {
+				label = "Linux Kernel";
+				reg = <0x020000 0x180000>;
+			};
+
+			partition@1a0000 {
+				label = "File System";
+				reg = <0x1a0000 0x630000>;
+			};
+
+			uboot: partition@7d0000 {
+				label = "U-boot";
+				reg = <0x7d0000 0x030000>;
+				read-only;
+			};
+		};
+	};
+};
+
+&ehci0 {
+	status = "okay";
+};
+
+&i2c {
+	status = "okay";
+	clock-frequency = <100000>;
+
+	/* fan speed PWM */
+	fan@3e {
+		compatible = "g760a";
+		reg = <0x3e>;
+	};
+
+	/* temp sensor and thermal watchdog */
+	temperature-sensor@48 {
+		compatible = "gmt,g751";
+		reg = <0x48>;
+	};
+
+	/* RTC w/ alarm */
+	rtc@68 {
+		compatible = "st,m41t80";
+		reg = <0x68>;
+	};
+};
+
+&mdio {
+	status = "okay";
+
+	ethphy: ethernet-phy {
+		reg = <8>;
+	};
+};
+
+&eth {
+	status = "okay";
+	pinctrl-0 = <&pmx_ge>;
+	pinctrl-names = "default";
+	clocks = <&core_clk 0>;
+};
+
+&ethport {
+	phy-handle = <&ethphy>;
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&pinctrl {
+	pmx_gpio_leds: pmx-gpio-leds {
+		marvell,pins = "mpp1", "mpp2", "mpp5";
+		marvell,function = "gpio";
+	};
+
+	pmx_gpio_misc: pmx-gpio-misc {
+		/* set marvell,pins in board file */
+		marvell,function = "gpio";
+	};
+
+	pmx_power_off: pmx-power-off {
+		marvell,pins = "mpp8";
+		marvell,function = "gpio";
+	};
+
+	pmx_gpio_keys: pmx-gpio-keys {
+		marvell,pins = "mpp9", "mpp10";
+		marvell,function = "gpio";
+	};
+
+	pmx_ge: pmx-ge {
+		marvell,function = "ge";
+	};
+};
+
+&sata {
+	pinctrl-0 = <&pmx_sata0 &pmx_sata1>;
+	pinctrl-names = "default";
+	status = "okay";
+	nr-ports = <2>;
+};
+
+&pciec {
+	status = "okay";
+};
+
+&pcie0 {
+	status = "okay";
+};

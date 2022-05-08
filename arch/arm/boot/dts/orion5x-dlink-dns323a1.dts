@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2022 Mauri Sandberg <maukka@ext.kapsi.fi>
+ *
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+#include "orion5x-mv88f5181.dtsi"
+#include "orion5x-dlink-dns323.dtsi"
+
+/ {
+	model = "D-Link DNS-323 rev A1";
+	compatible = "dlink,dns323a1", "dlink,dns323", "marvell,orion5x-88f5181",
+		     "marvell,orion5x";
+};
+
+/delete-node/ &sata;
+
+&gpio0 {
+	pinctrl-0 = <&pmx_gpio_misc>;
+	pinctrl-names = "default";
+
+	/* The DNS323 rev A1 power LED requires GPIO 4 to be low. */
+	pin_gpio0_4 {
+		gpio-hog;
+		gpios = <4 GPIO_ACTIVE_LOW>;
+		output-high;
+		line-name = "Power led enable";
+	};
+};
+
+&pmx_gpio_misc {
+	marvell,pins = "mpp4";
+};
+
+&pmx_ge {
+	marvell,pins = "mpp11", "mpp12", "mpp13", "mpp14", "mpp15",
+		       "mpp16", "mpp17", "mpp18", "mpp19";
+};

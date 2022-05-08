@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2022 Mauri Sandberg <maukka@ext.kapsi.fi>
+ *
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+#include "orion5x-mv88f5182.dtsi"
+#include "orion5x-dlink-dns323.dtsi"
+
+/ {
+	model = "D-Link DNS-323 rev B1";
+	compatible = "dlink,dns323b1", "dlink,dns323", "marvell,orion5x-88f5182",
+		     "marvell,orion5x";
+};
+
+&gpio0 {
+	pinctrl-0 = <&pmx_gpio_misc>;
+	pinctrl-names = "default";
+
+	/* The rev B1 has a flag to indicate the system is up.
+	 * Without this flag set, power LED will flash and cannot be
+	 * controlled via gpio-leds.
+	 */
+	pin_gpio0_3 {
+		gpio-hog;
+		gpios = <3 GPIO_ACTIVE_LOW>;
+		output-high;
+		line-name = "System up";
+	};
+};
+
+&pmx_gpio_misc {
+	marvell,pins = "mpp3";
+};
