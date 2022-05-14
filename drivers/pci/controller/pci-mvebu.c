@@ -1405,6 +1405,54 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
 	return 0;
 }
 
+static int orion_pcie_rd_conf_wa(void __iomem *wa_base, struct pci_bus *bus,
+			  u32 devfn, int where, int size, u32 *val)
+{
+	*val = readl(wa_base + (PCIE_CONF_BUS(bus->number) |
+				PCIE_CONF_DEV(PCI_SLOT(devfn)) |
+				PCIE_CONF_FUNC(PCI_FUNC(devfn)) |
+				PCIE_CONF_REG(where)));
+
+	if (size == 1)
+		*val = (*val >> (8 * (where & 3))) & 0xff;
+	else if (size == 2)
+		*val = (*val >> (8 * (where & 3))) & 0xffff;
+
+	return PCIBIOS_SUCCESSFUL;
+}
+
+/* Relevant only for Orion-1/Orion-NAS */
+#define ORION5X_PCIE_WA_PHYS_BASE	0xf0000000
+#define ORION5X_PCIE_WA_VIRT_BASE	IOMEM(0xfd000000)
+#define ORION5X_PCIE_WA_SIZE		SZ_16M
+#define ORION_MBUS_PCIE_WA_TARGET	0x04
+#define ORION_MBUS_PCIE_WA_ATTR		0x79
+
+static int mvebu_pcie_child_rd_conf_wa(struct pci_bus *bus, u32 devfn, int where, int size, u32 *val)
+{
+	struct mvebu_pcie *pcie = bus->sysdata;
+	struct mvebu_pcie_port *port;
+
+	port = mvebu_pcie_find_port(pcie, bus, devfn);
+	if (!port)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	if (!mvebu_pcie_link_up(port))
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	/*
+	 * We only support access to the non-extended configuration
+	 * space when using the WA access method (or we would have to
+	 * sacrifice 256M of CPU virtual address space.)
+	 */
+	if (where >= 0x100) {
+		*val = 0xffffffff;
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	}
+
+	return orion_pcie_rd_conf_wa(ORION5X_PCIE_WA_VIRT_BASE, bus, devfn, where, size, val);
+}
+
 static int mvebu_pcie_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -1581,6 +1629,16 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
 	bridge->align_resource = mvebu_pcie_align_resource;
 	bridge->map_irq = mvebu_pcie_map_irq;
 
+	if (of_machine_is_compatible("marvell,orion5x-88f5181")) {
+		dev_info(dev, "Applying Orion-1/Orion-NAS PCIe config read transaction workaround\n");
+
+		mvebu_pcie_child_ops.read = mvebu_pcie_child_rd_conf_wa;
+		mvebu_mbus_add_window_by_id(ORION_MBUS_PCIE_WA_TARGET,
+					    ORION_MBUS_PCIE_WA_ATTR,
+					    ORION5X_PCIE_WA_PHYS_BASE,
+					    ORION5X_PCIE_WA_SIZE);
+	}
+
 	return pci_host_probe(bridge);
 }
 
@@ -1646,6 +1704,7 @@ static const struct of_device_id mvebu_pcie_of_match_table[] = {
 	{ .compatible = "marvell,armada-370-pcie", },
 	{ .compatible = "marvell,dove-pcie", },
 	{ .compatible = "marvell,kirkwood-pcie", },
+	{ .compatible = "marvell,orion5x-pcie", },
 	{},
 };
 

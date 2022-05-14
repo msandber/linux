@@ -5,7 +5,7 @@ menu "PCI controller drivers"
 
 config PCI_MVEBU
 	tristate "Marvell EBU PCIe controller"
-	depends on ARCH_MVEBU || ARCH_DOVE || COMPILE_TEST
+	depends on ARCH_MVEBU || ARCH_DOVE || ARCH_ORION5X || COMPILE_TEST
 	depends on MVEBU_MBUS
 	depends on ARM
 	depends on OF
