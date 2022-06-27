@@ -83,8 +83,8 @@
 				reg = <0x0800 0 0 0 0>;
 				#address-cells = <3>;
 				#size-cells = <2>;
-				interrupt-names = "intx";
-				interrupts-extended = <&mpic 58>;
+				interrupt-names = "intx", "error";
+				interrupts-extended = <&mpic 58>, <&soc_err 4>;
 				#interrupt-cells = <1>;
 				ranges = <0x82000000 0 0 0x82000000 0x1 0 1 0
 					  0x81000000 0 0 0x81000000 0x1 0 1 0>;
@@ -111,8 +111,8 @@
 				reg = <0x1000 0 0 0 0>;
 				#address-cells = <3>;
 				#size-cells = <2>;
-				interrupt-names = "intx";
-				interrupts-extended = <&mpic 59>;
+				interrupt-names = "intx", "error";
+				interrupts-extended = <&mpic 59>, <&soc_err 4>;
 				#interrupt-cells = <1>;
 				ranges = <0x82000000 0 0 0x82000000 0x2 0 1 0
 					  0x81000000 0 0 0x81000000 0x2 0 1 0>;
@@ -139,8 +139,8 @@
 				reg = <0x1800 0 0 0 0>;
 				#address-cells = <3>;
 				#size-cells = <2>;
-				interrupt-names = "intx";
-				interrupts-extended = <&mpic 60>;
+				interrupt-names = "intx", "error";
+				interrupts-extended = <&mpic 60>, <&soc_err 4>;
 				#interrupt-cells = <1>;
 				ranges = <0x82000000 0 0 0x82000000 0x3 0 1 0
 					  0x81000000 0 0 0x81000000 0x3 0 1 0>;
@@ -167,8 +167,8 @@
 				reg = <0x2000 0 0 0 0>;
 				#address-cells = <3>;
 				#size-cells = <2>;
-				interrupt-names = "intx";
-				interrupts-extended = <&mpic 61>;
+				interrupt-names = "intx", "error";
+				interrupts-extended = <&mpic 61>, <&soc_err 4>;
 				#interrupt-cells = <1>;
 				ranges = <0x82000000 0 0 0x82000000 0x4 0 1 0
 					  0x81000000 0 0 0x81000000 0x4 0 1 0>;
@@ -195,8 +195,8 @@
 				reg = <0x2800 0 0 0 0>;
 				#address-cells = <3>;
 				#size-cells = <2>;
-				interrupt-names = "intx";
-				interrupts-extended = <&mpic 62>;
+				interrupt-names = "intx", "error";
+				interrupts-extended = <&mpic 62>, <&soc_err 5>;
 				#interrupt-cells = <1>;
 				ranges = <0x82000000 0 0 0x82000000 0x5 0 1 0
 					  0x81000000 0 0 0x81000000 0x5 0 1 0>;
