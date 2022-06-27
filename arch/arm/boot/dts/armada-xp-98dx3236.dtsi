@@ -76,8 +76,8 @@
 				reg = <0x0800 0 0 0 0>;
 				#address-cells = <3>;
 				#size-cells = <2>;
-				interrupt-names = "intx";
-				interrupts-extended = <&mpic 58>;
+				interrupt-names = "intx", "error";
+				interrupts-extended = <&mpic 58>, <&soc_err 4>;
 				#interrupt-cells = <1>;
 				ranges = <0x82000000 0 0 0x82000000 0x1 0 1 0
 					  0x81000000 0 0 0x81000000 0x1 0 1 0>;
