@@ -171,6 +171,11 @@
 				#size-cells = <1>;
 				interrupt-controller;
 				msi-controller;
+
+				soc_err: interrupt-controller@20 {
+					interrupt-controller;
+					#interrupt-cells = <1>;
+				};
 			};
 
 			coherencyfab: coherency-fabric@20200 {
