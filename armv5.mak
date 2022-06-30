@@ -14,7 +14,7 @@ makethreads	:= $(shell dc -e "$(makejobs) 1 + p")
 rootfsbase	:= $(shell basename $(rootfs))
 dtb		:= $(build_dir)/arch/$(ARCH)/boot/dts/orion5x-dlink-dns323a1.dtb
 
-cmdline		:= "console=ttyS0,115200 rootfstype=ramfs"
+cmdline		:= "console=ttyS0,230400 rootfstype=ramfs"
 
 make_options := -f Makefile \
 		-j$(makethreads) -l$(makejobs) \
@@ -85,6 +85,7 @@ config-initramfs: config-base
 	--enable INITRAMFS_COMPRESSION_XZ \
 	--enable CMDLINE_BOOL \
 	--set-str CMDLINE $(cmdline) \
+	--enable CMDLINE_FORCE \
 	--enable TMPFS \
 	--enable DEVTMPFS \
 	--enable SYSFS \
@@ -111,7 +112,8 @@ config-dns323: config-base
 	--enable SENSORS_G760A \
 	--enable SENSORS_LM75 \
 	--enable POWER_RESET \
-	--enable POWER_RESET_GPIO
+	--enable POWER_RESET_GPIO \
+	--enable PCI_MVEBU
 
 config-raid: config-base
 	$(CURDIR)/scripts/config --file $(config_file) \
