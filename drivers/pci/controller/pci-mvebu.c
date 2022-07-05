@@ -80,6 +80,7 @@ struct mvebu_pcie {
 	struct resource realio;
 	struct resource mem;
 	struct resource busn;
+	struct resource cfg;
 	int nports;
 };
 
@@ -93,6 +94,7 @@ struct mvebu_pcie_window {
 struct mvebu_pcie_port {
 	char *name;
 	void __iomem *base;
+	void __iomem *config_space;
 	u32 port;
 	u32 lane;
 	bool is_x4;
@@ -101,6 +103,8 @@ struct mvebu_pcie_port {
 	unsigned int mem_attr;
 	unsigned int io_target;
 	unsigned int io_attr;
+	unsigned int cfg_target;
+	unsigned int cfg_attr;
 	struct clk *clk;
 	struct gpio_desc *reset_gpio;
 	char *reset_name;
@@ -111,6 +115,7 @@ struct mvebu_pcie_port {
 	struct mvebu_pcie_window iowin;
 	u32 saved_pcie_stat;
 	struct resource regs;
+	struct resource cfg_space;
 	struct irq_domain *intx_irq_domain;
 	raw_spinlock_t irq_lock;
 	int intx_irq;
@@ -1095,7 +1100,23 @@ static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
 	return devm_ioremap_resource(&pdev->dev, &port->regs);
 }
 
+static void __iomem *mvebu_pcie_map_config_space(struct platform_device *pdev,
+						 struct device_node *np,
+						 struct mvebu_pcie_port *port)
+{
+	int ret = 0;
+
+	ret = of_address_to_resource(np, 1, &port->cfg_space);
+	if (ret)
+		return (void __iomem *)ERR_PTR(ret);
+
+	pr_info("SAIN config spacen!\n");
+
+	return devm_ioremap_resource(&pdev->dev, &port->cfg_space);
+}
+
 #define DT_FLAGS_TO_TYPE(flags)       (((flags) >> 24) & 0x03)
+#define    DT_TYPE_CFG                0x0
 #define    DT_TYPE_IO                 0x1
 #define    DT_TYPE_MEM32              0x2
 #define DT_CPUADDR_TO_TARGET(cpuaddr) (((cpuaddr) >> 56) & 0xFF)
@@ -1131,6 +1152,8 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
 			rtype = IORESOURCE_IO;
 		else if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_MEM32)
 			rtype = IORESOURCE_MEM;
+		else if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_CFG)
+			rtype = DT_TYPE_CFG;
 		else
 			continue;
 
@@ -1238,6 +1261,13 @@ static int mvebu_pcie_parse_port(struct mvebu_pcie *pcie,
 	} else {
 		port->io_target = -1;
 		port->io_attr = -1;
+	}
+
+	ret = mvebu_get_tgt_attr(dev->of_node, port->devfn, DT_TYPE_CFG, &port->cfg_target, &port->cfg_attr);
+
+	if (ret || (resource_size(&pcie->cfg) == 0)) {
+		port->cfg_target = -1;
+		port->cfg_attr = -1;
 	}
 
 	/*
@@ -1357,6 +1387,15 @@ static void mvebu_pcie_powerdown(struct mvebu_pcie_port *port)
 	clk_disable_unprepare(port->clk);
 }
 
+struct resource iocfg_resource = {
+	.name	= "PCI WA",
+	.start	= 0,
+	.end	= -1,
+	.flags	= IORESOURCE_MEM,
+};
+
+static int cfg_space_size = 0;
+
 /*
  * devm_of_pci_get_host_bridge_resources() only sets up translateable resources,
  * so we need extra resource setup parsing our special DT properties encoding
@@ -1402,6 +1441,33 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
 			return ret;
 	}
 
+	/* Get the PCIe configuration space aperture */
+	mvebu_mbus_get_pcie_cfg_aperture(&pcie->cfg);
+
+	switch (resource_size(&pcie->cfg)) {
+	case SZ_16M:
+		cfg_space_size = PCI_CFG_SPACE_SIZE;
+		break;
+	case SZ_256M:
+		cfg_space_size = PCI_CFG_SPACE_EXP_SIZE;
+		break;
+	default:
+		pcie->cfg.start = -1;
+		pcie->cfg.end = -1;
+	}
+
+	if (resource_size(&pcie->cfg) > 0)
+	{
+		pcie->cfg.name = "PCI Config WA";
+
+		ret = devm_request_resource(dev, &iocfg_resource, &pcie->cfg);
+
+		if (ret) {
+			dev_info(dev, "request for cfg resource failed\n");
+			return ret;
+		}
+	}
+
 	return 0;
 }
 
@@ -1421,13 +1487,6 @@ static int orion_pcie_rd_conf_wa(void __iomem *wa_base, struct pci_bus *bus,
 	return PCIBIOS_SUCCESSFUL;
 }
 
-/* Relevant only for Orion-1/Orion-NAS */
-#define ORION5X_PCIE_WA_PHYS_BASE	0xf0000000
-#define ORION5X_PCIE_WA_VIRT_BASE	IOMEM(0xfd000000)
-#define ORION5X_PCIE_WA_SIZE		SZ_16M
-#define ORION_MBUS_PCIE_WA_TARGET	0x04
-#define ORION_MBUS_PCIE_WA_ATTR		0x79
-
 static int mvebu_pcie_child_rd_conf_wa(struct pci_bus *bus, u32 devfn, int where, int size, u32 *val)
 {
 	struct mvebu_pcie *pcie = bus->sysdata;
@@ -1440,17 +1499,12 @@ static int mvebu_pcie_child_rd_conf_wa(struct pci_bus *bus, u32 devfn, int where
 	if (!mvebu_pcie_link_up(port))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	/*
-	 * We only support access to the non-extended configuration
-	 * space when using the WA access method (or we would have to
-	 * sacrifice 256M of CPU virtual address space.)
-	 */
-	if (where >= 0x100) {
+	if (where >= cfg_space_size) {
 		*val = 0xffffffff;
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 
-	return orion_pcie_rd_conf_wa(ORION5X_PCIE_WA_VIRT_BASE, bus, devfn, where, size, val);
+	return orion_pcie_rd_conf_wa(port->config_space, bus, devfn, where, size, val);
 }
 
 static int mvebu_pcie_probe(struct platform_device *pdev)
@@ -1515,6 +1569,11 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
 			port->base = NULL;
 			mvebu_pcie_powerdown(port);
 			continue;
+		}
+
+		port->config_space = mvebu_pcie_map_config_space(pdev, child, port);
+		if (IS_ERR(port->config_space)) {
+			dev_err(dev, "%s: cannot map configuration space\n", port->name);
 		}
 
 		ret = mvebu_pci_bridge_emul_init(port);
@@ -1631,12 +1690,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
 
 	if (of_machine_is_compatible("marvell,orion5x-88f5181")) {
 		dev_info(dev, "Applying Orion-1/Orion-NAS PCIe config read transaction workaround\n");
-
 		mvebu_pcie_child_ops.read = mvebu_pcie_child_rd_conf_wa;
-		mvebu_mbus_add_window_by_id(ORION_MBUS_PCIE_WA_TARGET,
-					    ORION_MBUS_PCIE_WA_ATTR,
-					    ORION5X_PCIE_WA_PHYS_BASE,
-					    ORION5X_PCIE_WA_SIZE);
 	}
 
 	return pci_host_probe(bridge);
