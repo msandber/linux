@@ -14,7 +14,7 @@ makethreads	:= $(shell dc -e "$(makejobs) 1 + p")
 rootfsbase	:= $(shell basename $(rootfs))
 dtb		:= $(build_dir)/arch/$(ARCH)/boot/dts/orion5x-dlink-dns323a1.dtb
 
-cmdline		:= "console=ttyS0,230400 rootfstype=ramfs"
+cmdline		:= "console=ttyS0,230400 rootfstype=ramfs earlyprintk=ttyS0,230400"
 
 make_options := -f Makefile \
 		-j$(makethreads) -l$(makejobs) \
@@ -90,6 +90,7 @@ config-initramfs: config-base
 	--enable DEVTMPFS \
 	--enable SYSFS \
 	--enable DEBUG_FS \
+	--enable EARLY_PRINTK
 
 config-devicetree: config-base
 	# Configure in the optional device tree if available
