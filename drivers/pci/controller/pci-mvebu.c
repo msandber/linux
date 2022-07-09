@@ -1713,8 +1713,15 @@ static int mvebu_pcie_remove(struct platform_device *pdev)
 		mvebu_writel(port, ~PCIE_INT_ALL_MASK, PCIE_INT_CAUSE_OFF);
 
 		/* Remove IRQ domains. */
-		if (port->intx_irq_domain)
+		if (port->intx_irq_domain) {
+			int virq, j;
+			for (j = 0; j < PCI_NUM_INTX; j++) {
+				virq = irq_find_mapping(port->intx_irq_domain, j);
+				if (virq > 0)
+					irq_dispose_mapping(virq);
+			}
 			irq_domain_remove(port->intx_irq_domain);
+		}
 
 		/* Free config space for emulated root bridge. */
 		pci_bridge_emul_cleanup(&port->bridge);
