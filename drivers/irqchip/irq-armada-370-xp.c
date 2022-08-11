@@ -509,7 +509,9 @@ static void armada_xp_mpic_reenable_percpu(void)
 		armada_370_xp_irq_unmask(data);
 	}
 
-	ipi_resume();
+	/* IPI is used only when we do not have parent irq */
+	if (parent_irq <= 0)
+		ipi_resume();
 }
 
 static int armada_xp_mpic_starting_cpu(unsigned int cpu)
@@ -730,7 +732,9 @@ static void armada_370_xp_mpic_resume(void)
 	if (doorbell_mask_reg & PCI_MSI_DOORBELL_MASK)
 		writel(1, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
 
-	ipi_resume();
+	/* IPI is used only when we do not have parent irq */
+	if (parent_irq <= 0)
+		ipi_resume();
 }
 
 static struct syscore_ops armada_370_xp_mpic_syscore_ops = {
