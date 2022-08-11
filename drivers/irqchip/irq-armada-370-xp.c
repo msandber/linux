@@ -293,7 +293,7 @@ static int armada_370_xp_msi_init(struct device_node *node,
 	writel(reg, per_cpu_int_base +
 	       ARMADA_370_XP_IN_DRBEL_MSK_OFFS);
 
-	/* Unmask IPI interrupt */
+	/* Unmask MSI interrupt */
 	writel(1, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
 
 	return 0;
