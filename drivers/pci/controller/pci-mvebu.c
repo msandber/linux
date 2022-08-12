@@ -528,7 +528,7 @@ static int mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
 
 	/* Are the new iobase/iolimit values invalid? */
 	if (conf->iolimit < conf->iobase ||
-	    conf->iolimitupper < conf->iobaseupper)
+	    le16_to_cpu(conf->iolimitupper) < le16_to_cpu(conf->iobaseupper))
 		return mvebu_pcie_set_window(port, port->io_target, port->io_attr,
 					     &desired, &port->iowin);
 
@@ -540,10 +540,10 @@ static int mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
 	 * is the CPU address.
 	 */
 	desired.remap = ((conf->iobase & 0xF0) << 8) |
-			(conf->iobaseupper << 16);
+			(le16_to_cpu(conf->iobaseupper) << 16);
 	desired.base = port->pcie->io.start + desired.remap;
 	desired.size = ((0xFFF | ((conf->iolimit & 0xF0) << 8) |
-			 (conf->iolimitupper << 16)) -
+			 (le16_to_cpu(conf->iolimitupper) << 16)) -
 			desired.remap) +
 		       1;
 
@@ -557,7 +557,7 @@ static int mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
 	struct pci_bridge_emul_conf *conf = &port->bridge.conf;
 
 	/* Are the new membase/memlimit values invalid? */
-	if (conf->memlimit < conf->membase)
+	if (le16_to_cpu(conf->memlimit) < le16_to_cpu(conf->membase))
 		return mvebu_pcie_set_window(port, port->mem_target, port->mem_attr,
 					     &desired, &port->memwin);
 
@@ -567,8 +567,8 @@ static int mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
 	 * window to setup, according to the PCI-to-PCI bridge
 	 * specifications.
 	 */
-	desired.base = ((conf->membase & 0xFFF0) << 16);
-	desired.size = (((conf->memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+	desired.base = ((le16_to_cpu(conf->membase) & 0xFFF0) << 16);
+	desired.size = (((le16_to_cpu(conf->memlimit) & 0xFFF0) << 16) | 0xFFFFF) -
 		       desired.base + 1;
 
 	return mvebu_pcie_set_window(port, port->mem_target, port->mem_attr, &desired,
