@@ -96,6 +96,7 @@ struct mvebu_pcie {
 	struct resource io;
 	struct resource realio;
 	struct resource mem;
+	struct resource cfg;
 	int nports;
 };
 
@@ -127,6 +128,7 @@ struct mvebu_pcie_port {
 	struct mvebu_pcie_window iowin;
 	u32 saved_pcie_stat;
 	struct resource regs;
+	struct resource cfg;
 	u8 slot_power_limit_value;
 	u8 slot_power_limit_scale;
 	struct irq_domain *rp_irq_domain;
@@ -409,6 +411,7 @@ static int mvebu_pcie_child_rd_conf(struct pci_bus *bus, u32 devfn, int where,
 	struct mvebu_pcie *pcie = bus->sysdata;
 	struct mvebu_pcie_port *port;
 	void __iomem *conf_data;
+	u32 offset;
 
 	port = mvebu_pcie_find_port(pcie, bus, devfn);
 	if (!port) {
@@ -421,10 +424,20 @@ static int mvebu_pcie_child_rd_conf(struct pci_bus *bus, u32 devfn, int where,
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 
-	conf_data = port->base + PCIE_CONF_DATA_OFF;
+	if (resource_size(&port->cfg)) {
+		offset = PCIE_CONF_ADDR(bus->number, devfn, where) & ~PCIE_CONF_ADDR_EN;
+		if (offset >= resource_size(&port->cfg))
+			return PCIBIOS_DEVICE_NOT_FOUND;
 
-	mvebu_writel(port, PCIE_CONF_ADDR(bus->number, devfn, where),
-		     PCIE_CONF_ADDR_OFF);
+		conf_data = pci_remap_cfgspace(port->cfg.start + offset, size);
+		if (!conf_data)
+			return PCIBIOS_DEVICE_NOT_FOUND;
+	} else {
+		conf_data = port->base + PCIE_CONF_DATA_OFF;
+
+		mvebu_writel(port, PCIE_CONF_ADDR(bus->number, devfn, where),
+			     PCIE_CONF_ADDR_OFF);
+	}
 
 	switch (size) {
 	case 1:
@@ -438,8 +451,13 @@ static int mvebu_pcie_child_rd_conf(struct pci_bus *bus, u32 devfn, int where,
 		break;
 	default:
 		*val = 0xffffffff;
+		if (resource_size(&port->cfg))
+			iounmap(conf_data);
 		return PCIBIOS_BAD_REGISTER_NUMBER;
 	}
+
+	if (resource_size(&port->cfg))
+		iounmap(conf_data);
 
 	return PCIBIOS_SUCCESSFUL;
 }
@@ -450,6 +468,7 @@ static int mvebu_pcie_child_wr_conf(struct pci_bus *bus, u32 devfn,
 	struct mvebu_pcie *pcie = bus->sysdata;
 	struct mvebu_pcie_port *port;
 	void __iomem *conf_data;
+	u32 offset;
 
 	port = mvebu_pcie_find_port(pcie, bus, devfn);
 	if (!port)
@@ -458,10 +477,20 @@ static int mvebu_pcie_child_wr_conf(struct pci_bus *bus, u32 devfn,
 	if (!mvebu_pcie_link_up(port))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	conf_data = port->base + PCIE_CONF_DATA_OFF;
+	if (resource_size(&port->cfg)) {
+		offset = PCIE_CONF_ADDR(bus->number, devfn, where) & ~PCIE_CONF_ADDR_EN;
+		if (offset >= resource_size(&port->cfg))
+			return PCIBIOS_DEVICE_NOT_FOUND;
 
-	mvebu_writel(port, PCIE_CONF_ADDR(bus->number, devfn, where),
-		     PCIE_CONF_ADDR_OFF);
+		conf_data = pci_remap_cfgspace(port->cfg.start + offset, size);
+		if (!conf_data)
+			return PCIBIOS_DEVICE_NOT_FOUND;
+	} else {
+		conf_data = port->base + PCIE_CONF_DATA_OFF;
+
+		mvebu_writel(port, PCIE_CONF_ADDR(bus->number, devfn, where),
+			     PCIE_CONF_ADDR_OFF);
+	}
 
 	switch (size) {
 	case 1:
@@ -474,8 +503,13 @@ static int mvebu_pcie_child_wr_conf(struct pci_bus *bus, u32 devfn,
 		writel(val, conf_data);
 		break;
 	default:
+		if (resource_size(&port->cfg))
+			iounmap(conf_data);
 		return PCIBIOS_BAD_REGISTER_NUMBER;
 	}
+
+	if (resource_size(&port->cfg))
+		iounmap(conf_data);
 
 	return PCIBIOS_SUCCESSFUL;
 }
@@ -1520,6 +1554,41 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
 	return -ENOENT;
 }
 
+static int mvebu_get_cfg_tgt_attr(struct device_node *np, phys_addr_t start,
+				  struct resource *res,
+				  unsigned int *tgt, unsigned int *attr)
+{
+	const __be32 *addrp;
+	unsigned int flags;
+	u64 cpuaddr;
+	u64 size;
+
+	/* get second cell from assigned-addresses property */
+	addrp = of_get_address(np, 1, &size, &flags);
+	if (!addrp)
+		return -EINVAL;
+
+	if (!(flags & IORESOURCE_MEM))
+		return -EINVAL;
+
+	flags |= IORESOURCE_MEM_NONPOSTED;
+
+	cpuaddr = of_translate_address(np, addrp);
+	if (cpuaddr == OF_BAD_ADDR)
+		return -EINVAL;
+
+	*tgt = DT_CPUADDR_TO_TARGET(cpuaddr);
+	*attr = DT_CPUADDR_TO_ATTR(cpuaddr);
+
+	memset(res, 0, sizeof(*res));
+	res->start = start;
+	res->end = start + size - 1;
+	res->flags = flags;
+	res->name = "PCI CFG";
+
+	return 0;
+}
+
 #ifdef CONFIG_PM_SLEEP
 static int mvebu_pcie_suspend(struct device *dev)
 {
@@ -1803,6 +1872,20 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
 			return ret;
 	}
 
+	if (of_device_is_compatible(dev->of_node, "marvell,orion5x-pcie")) {
+		/* Get the PCIe configuration space aperture */
+		mvebu_mbus_get_pcie_cfg_aperture(&pcie->cfg);
+		if (resource_size(&pcie->cfg) == 0) {
+			dev_err(dev, "invalid config space aperature size\n");
+			return -EINVAL;
+		}
+
+		pcie->cfg.name = "PCI CFG";
+		ret = devm_request_resource(dev, &iomem_resource, &pcie->cfg);
+		if (ret)
+			return ret;
+	}
+
 	return 0;
 }
 
@@ -1813,6 +1896,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
 	struct pci_host_bridge *bridge;
 	struct device_node *np = dev->of_node;
 	struct device_node *child;
+	phys_addr_t pcie_cfg_offset;
 	int num, i, ret;
 
 	bridge = devm_pci_alloc_host_bridge(dev, sizeof(struct mvebu_pcie));
@@ -1826,6 +1910,8 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
 	ret = mvebu_pcie_parse_request_resources(pcie);
 	if (ret)
 		return ret;
+
+	pcie_cfg_offset = pcie->cfg.start;
 
 	num = of_get_available_child_count(np);
 
@@ -1860,6 +1946,35 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
 		ret = mvebu_pcie_powerup(port);
 		if (ret < 0)
 			continue;
+
+		if (resource_size(&pcie->cfg) != 0) {
+			unsigned int cfg_target, cfg_attr;
+
+			ret = mvebu_get_cfg_tgt_attr(child, pcie_cfg_offset, &port->cfg, &cfg_target, &cfg_attr);
+			if (ret) {
+				dev_err(dev, "%s: missing address range for cfg space\n", port->name);
+				mvebu_pcie_powerdown(port);
+				continue;
+			}
+
+			if (port->cfg.end >= pcie->cfg.end) {
+				dev_err(dev, "%s: requested cfg space of %u bytes is too large, available only %u bytes\n",
+					port->name, resource_size(&port->cfg), pcie->cfg.end - port->cfg.end);
+				mvebu_pcie_powerdown(port);
+				continue;
+			}
+
+			ret = mvebu_mbus_add_window_by_id(cfg_target, cfg_attr, port->cfg.start, resource_size(&port->cfg));
+			if (ret) {
+				dev_info(dev, "%s: cannot add mbus window for cfg space: %d\n", port->name, ret);
+				mvebu_pcie_powerdown(port);
+				continue;
+			}
+
+			pcie_cfg_offset += resource_size(&port->cfg);
+		}
+
+		/* TODO: call mvebu_mbus_del_window(port->cfg.start, resource_size(&port->cfg)); for all failures below */
 
 		port->base = mvebu_pcie_map_registers(pdev, child, port);
 		if (IS_ERR(port->base)) {
@@ -2102,6 +2217,9 @@ static int mvebu_pcie_remove(struct platform_device *pdev)
 		if (port->memwin.size)
 			mvebu_pcie_del_windows(port, port->memwin.base, port->memwin.size);
 
+		if (resource_size(&port->cfg))
+			mvebu_mbus_del_window(port->cfg.start, resource_size(&port->cfg));
+
 		/* Power down card and disable clocks. Must be the last step. */
 		mvebu_pcie_powerdown(port);
 	}
@@ -2114,6 +2232,7 @@ static const struct of_device_id mvebu_pcie_of_match_table[] = {
 	{ .compatible = "marvell,armada-370-pcie", },
 	{ .compatible = "marvell,dove-pcie", },
 	{ .compatible = "marvell,kirkwood-pcie", },
+	{ .compatible = "marvell,orion5x-pcie", },
 	{},
 };
 
