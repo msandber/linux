@@ -20,55 +20,6 @@
 	/delete-node/ sa-sram;	/* crypto_sram */
 
 	soc {
-		pcie-mem-aperture = <0xe0000000 0x08000000>; /* 128 MiB memory space */
-		pcie-io-aperture  = <0xf2000000 0x00100000>; /*   1 MiB I/O space */
-
-		pciec: pcie {
-			compatible = "marvell,orion5x-pcie";
-			status = "okay";
-			device_type = "pci";
-			#address-cells = <3>;
-			#size-cells = <2>;
-
-			msi-parent = <&intc>;
-			bus-range = <0x00 0xff>;
-
-			ranges = <0x82000000 0   0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x2000
-				  0x82000000 0x1 0x0     MBUS_ID(0x04, 0x59) 0       1 0   /* Port 0.0 Mem */
-				  0x81000000 0x1 0x0     MBUS_ID(0x04, 0x51) 0       1 0>; /* Port 0.0 I/O */
-
-			pcie@1,0 {
-				status = "okay";
-
-				device_type = "pci";
-				assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
-				reg = <0x0800 0 0 0 0>;
-				clocks = <&core_clk 0>;
-				marvell,pcie-port = <0>;
-				marvell,pcie-lane = <0>;
-
-				#address-cells = <3>;
-				#size-cells = <2>;
-				#interrupt-cells = <1>;
-				ranges = <0x82000000 0 0 0x82000000 0x1 0 1 0
-				          0x81000000 0 0 0x81000000 0x1 0 1 0>;
-				bus-range = <0x00 0xff>;
-
-				interrupt-names = "intx", "error";
-				interrupts = <11>, <10>;
-				interrupt-map-mask = <0 0 0 7>;
-				interrupt-map = <0 0 0 1 &pcie_intc 0>,
-				<0 0 0 2 &pcie_intc 1>,
-				<0 0 0 3 &pcie_intc 2>,
-				<0 0 0 4 &pcie_intc 3>;
-
-				pcie_intc: interrupt-controller {
-					interrupt-controller;
-					#interrupt-cells = <1>;
-				};
-			};
-		};
-
 		internal-regs {
 			/delete-node/ crypto@90000;
 			/delete-node/ sata@80000;

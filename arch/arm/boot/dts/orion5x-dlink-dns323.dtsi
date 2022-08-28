@@ -215,3 +215,12 @@
 	status = "okay";
 	nr-ports = <2>;
 };
+
+
+&pciec {
+	status = "okay";
+};
+
+&pcie0 {
+	status = "okay";
+};
